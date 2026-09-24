@@ -2,766 +2,980 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI TC</title>
 
-<!-- Puter.js -->
-<script src="https://js.puter.com/v2/"></script>
-
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDEBZ5NLY4PIUsF9D9A6mgqp_IHiY9Gy7c",
-  authDomain: "ai-tc-4b59f.firebaseapp.com",
-  projectId: "ai-tc-4b59f",
-  storageBucket: "ai-tc-4b59f.firebasestorage.app",
-  messagingSenderId: "755284292305",
-  appId: "1:755284292305:web:07be472337304e93998bf0"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
-
-window.firebaseAuth = auth;
-window.googleProvider = provider;
-window.signInWithPopup = signInWithPopup;
-window.signOut = signOut;
-
-onAuthStateChanged(auth, (user) => {
-
-  const loginScreen = document.getElementById("loginScreen");
-  const appScreen = document.getElementById("appScreen");
-
-  if (user) {
-
-    loginScreen.style.display = "none";
-    appScreen.style.display = "block";
-
-    document.getElementById("userName").textContent =
-      user.displayName || "User";
-
-    document.getElementById("userPhoto").src =
-      user.photoURL ||
-      "https://www.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png";
-
-  } else {
-
-    loginScreen.style.display = "flex";
-    appScreen.style.display = "none";
-
-  }
-
-});
-
-window.googleLogin = async function () {
-
-  try {
-
-    await signInWithPopup(auth, provider);
-
-  } catch (error) {
-
-    alert("Google Login Failed: " + error.message);
-
-  }
-
-};
-
-window.logout = async function () {
-
-  await signOut(auth);
-
-};
-
-</script>
-
 <style>
+*{box-sizing:border-box;margin:0;padding:0}
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+body{
+font-family:Arial,sans-serif;
+background:#080808;
+color:#fff;
+min-height:100vh
 }
 
-body {
-  font-family: Arial, sans-serif;
-  background:
-    radial-gradient(circle at top, #2b1400, #090909 45%);
-  color: white;
-  min-height: 100vh;
+button{font-family:inherit}
+
+#loginPage{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px
 }
 
-/* LOGIN */
-
-#loginScreen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+.box{
+width:100%;
+max-width:420px;
+background:#141414;
+padding:30px 22px;
+border-radius:22px;
+border:1px solid #ff790055;
+text-align:center
 }
 
-.loginBox {
-  width: 100%;
-  max-width: 420px;
-  background: rgba(25,25,25,0.92);
-  border: 1px solid rgba(255,105,0,0.3);
-  border-radius: 28px;
-  padding: 35px 25px;
-  text-align: center;
-  box-shadow: 0 20px 80px rgba(255,90,0,0.15);
+.logo{
+font-size:38px;
+font-weight:900;
+color:#ff7900;
+margin-bottom:10px
 }
 
-.logo {
-  width: 70px;
-  height: 70px;
-  margin: auto;
-  border-radius: 22px;
-  background: linear-gradient(135deg,#ff6500,#ff9d00);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  font-weight: bold;
-  color: white;
-  box-shadow: 0 10px 40px rgba(255,100,0,.35);
+.box p{
+color:#999;
+margin:10px 0 25px
 }
 
-.loginBox h1 {
-  margin-top: 22px;
-  font-size: 30px;
+.google{
+width:100%;
+padding:15px;
+border:0;
+border-radius:12px;
+font-weight:bold;
+font-size:16px;
+cursor:pointer
 }
 
-.loginBox p {
-  color: #aaa;
-  margin: 10px 0 28px;
-  line-height: 1.5;
+#appPage{display:none}
+
+header{
+height:64px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 16px;
+background:#101010;
+border-bottom:1px solid #292929
 }
 
-.googleBtn {
-  width: 100%;
-  border: none;
-  padding: 15px;
-  border-radius: 14px;
-  background: white;
-  color: #111;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
+.logo2{
+font-size:24px;
+font-weight:900;
+color:#ff7900
 }
 
-.googleBtn:hover {
-  opacity: .9;
+.logout{
+background:#1b1b1b;
+color:#fff;
+border:1px solid #333;
+padding:9px 13px;
+border-radius:9px
 }
 
-/* APP */
-
-#appScreen {
-  display: none;
-  min-height: 100vh;
+.container{
+max-width:850px;
+margin:auto;
+padding:25px 15px 50px
 }
 
-header {
-  height: 70px;
-  padding: 0 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  background: rgba(10,10,10,.8);
-  backdrop-filter: blur(20px);
+.hero{
+text-align:center;
+margin-bottom:25px
 }
 
-.brand {
-  font-size: 22px;
-  font-weight: bold;
+.hero h1{
+font-size:30px;
+margin-bottom:8px
 }
 
-.brand span {
-  color: #ff7200;
+.orange{color:#ff7900}
+
+.hero p{color:#999}
+
+.card{
+background:#121212;
+border:1px solid #292929;
+border-radius:18px;
+padding:18px;
+margin-bottom:20px
 }
 
-.userArea {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+label{
+display:block;
+font-weight:bold;
+margin-bottom:10px
 }
 
-.userArea img {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+/* MODE */
+
+.modes{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px
 }
 
-.logoutBtn {
-  background: #222;
-  border: 1px solid #333;
-  color: white;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
+.mode{
+padding:15px;
+background:#191919;
+border:1px solid #333;
+color:#ddd;
+border-radius:12px;
+font-weight:bold;
+cursor:pointer
 }
 
-/* MAIN */
-
-.main {
-  width: 100%;
-  max-width: 850px;
-  margin: auto;
-  padding: 25px 16px 50px;
+.mode.active{
+background:#ff7900;
+color:#111;
+border-color:#ff7900
 }
 
-.hero {
-  text-align: center;
-  padding: 25px 0;
+/* PROMPT */
+
+textarea{
+width:100%;
+height:160px;
+background:#080808;
+border:1px solid #333;
+border-radius:13px;
+padding:14px;
+color:white;
+font-size:16px;
+resize:vertical;
+outline:none
 }
 
-.hero h2 {
-  font-size: clamp(30px,8vw,52px);
-  background: linear-gradient(90deg,#fff,#ff8a00);
-  -webkit-background-clip: text;
-  color: transparent;
+textarea:focus{
+border-color:#ff7900
 }
 
-.hero p {
-  color: #999;
-  margin-top: 10px;
+/* REFERENCE IMAGE */
+
+.upload{
+border:2px dashed #444;
+border-radius:14px;
+padding:25px 15px;
+text-align:center;
+cursor:pointer;
+background:#0b0b0b
 }
 
-/* CARD */
-
-.generator {
-  background: rgba(20,20,20,.9);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 0 20px 70px rgba(0,0,0,.4);
+.upload:hover{
+border-color:#ff7900
 }
 
-.label {
-  font-size: 14px;
-  color: #aaa;
-  margin-bottom: 9px;
+.upload input{
+display:none
 }
 
-textarea {
-  width: 100%;
-  min-height: 150px;
-  resize: vertical;
-  background: #111;
-  border: 1px solid #333;
-  color: white;
-  border-radius: 16px;
-  padding: 16px;
-  outline: none;
-  font-size: 16px;
-  line-height: 1.5;
+.upload-title{
+font-size:17px;
+font-weight:bold;
+margin-bottom:7px
 }
 
-textarea:focus {
-  border-color: #ff6b00;
+.upload-sub{
+color:#888;
+font-size:13px
 }
 
-/* RATIO */
-
-.ratios {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 9px;
-  margin-top: 10px;
+.preview{
+display:none;
+margin-top:15px;
+position:relative
 }
 
-.ratio {
-  background: #151515;
-  border: 1px solid #333;
-  color: #bbb;
-  padding: 12px 5px;
-  border-radius: 12px;
-  cursor: pointer;
+.preview img{
+width:100%;
+max-height:400px;
+object-fit:contain;
+border-radius:14px;
+background:#050505
 }
 
-.ratio.active {
-  background: rgba(255,100,0,.15);
-  border-color: #ff6b00;
-  color: #ff8a00;
+.remove{
+margin-top:10px;
+width:100%;
+padding:10px;
+background:#222;
+color:#fff;
+border:1px solid #444;
+border-radius:10px;
+cursor:pointer
 }
 
-/* BUTTON */
+/* RATIOS */
 
-.generateBtn {
-  width: 100%;
-  margin-top: 20px;
-  border: none;
-  border-radius: 15px;
-  padding: 16px;
-  background: linear-gradient(90deg,#ff6500,#ff9d00);
-  color: white;
-  font-size: 17px;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(255,90,0,.25);
+.ratios{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:9px
 }
 
-.generateBtn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
+.ratio{
+padding:12px 5px;
+background:#191919;
+border:1px solid #333;
+color:#ddd;
+border-radius:10px;
+cursor:pointer
+}
+
+.ratio.active{
+background:#ff7900;
+color:#111;
+border-color:#ff7900;
+font-weight:bold
+}
+
+/* GENERATE */
+
+.generate{
+width:100%;
+margin-top:18px;
+padding:16px;
+border:0;
+border-radius:13px;
+background:linear-gradient(135deg,#ff7900,#ff9d3d);
+font-size:18px;
+font-weight:900;
+cursor:pointer
+}
+
+.generate:disabled{
+opacity:.5
+}
+
+/* STATUS */
+
+.status{
+display:none;
+text-align:center;
+color:#aaa;
+padding:20px
+}
+
+.loader{
+width:36px;
+height:36px;
+margin:auto auto 12px;
+border:4px solid #333;
+border-top-color:#ff7900;
+border-radius:50%;
+animation:spin 1s linear infinite
+}
+
+@keyframes spin{
+to{transform:rotate(360deg)}
+}
+
+/* ERROR */
+
+.error{
+display:none;
+background:#351313;
+border:1px solid #7d2929;
+color:#ff8585;
+padding:12px;
+border-radius:10px;
+margin-bottom:15px;
+text-align:center
 }
 
 /* RESULT */
 
-.result {
-  display: none;
-  margin-top: 25px;
+.result{
+display:none
 }
 
-.result img {
-  width: 100%;
-  display: block;
-  border-radius: 20px;
-  border: 1px solid #333;
+.result img{
+width:100%;
+display:block;
+border-radius:15px
 }
 
-.actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 12px;
+.actions{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:12px
 }
 
-.actionBtn {
-  padding: 14px;
-  border-radius: 13px;
-  border: 1px solid #333;
-  background: #171717;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
+.action{
+padding:13px;
+border-radius:11px;
+border:1px solid #333;
+background:#191919;
+color:#fff;
+font-weight:bold;
+cursor:pointer
 }
 
-.actionBtn:hover {
-  border-color: #ff6500;
+.action.download{
+background:#ff7900;
+color:#111;
+border-color:#ff7900
 }
 
-/* LOADING */
+@media(max-width:500px){
 
-.loading {
-  display: none;
-  text-align: center;
-  padding: 30px;
+.hero h1{
+font-size:26px
 }
 
-.spinner {
-  width: 42px;
-  height: 42px;
-  border: 4px solid #333;
-  border-top-color: #ff6500;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: auto;
+.ratios{
+grid-template-columns:repeat(2,1fr)
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
-
-.status {
-  color: #aaa;
-  margin-top: 12px;
-}
-
-/* MOBILE */
-
-@media(max-width:500px) {
-
-  header {
-    padding: 0 12px;
-  }
-
-  .userArea span {
-    display: none;
-  }
-
-  .main {
-    padding: 15px 12px 40px;
-  }
-
-  .generator {
-    padding: 14px;
-  }
-
-}
-
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN SCREEN -->
+<!-- LOGIN -->
 
-<section id="loginScreen">
+<section id="loginPage">
 
-  <div class="loginBox">
+<div class="box">
 
-    <div class="logo">
-      AI
-    </div>
+<div class="logo">AI TC</div>
 
-    <h1>AI TC</h1>
+<p>Create images with AI</p>
 
-    <p>
-      Create stunning AI images from simple prompts.
-    </p>
+<button class="google" id="googleLogin">
+Continue with Google
+</button>
 
-    <button class="googleBtn" onclick="googleLogin()">
-      Continue with Google
-    </button>
-
-  </div>
+</div>
 
 </section>
 
 
-<!-- APP SCREEN -->
+<!-- APP -->
 
-<section id="appScreen">
+<section id="appPage">
 
-  <header>
+<header>
 
-    <div class="brand">
-      AI <span>TC</span>
-    </div>
+<div class="logo2">AI TC</div>
 
-    <div class="userArea">
+<button class="logout" id="logout">
+Logout
+</button>
 
-      <span id="userName"></span>
-
-      <img id="userPhoto" src="">
-
-      <button class="logoutBtn" onclick="logout()">
-        Logout
-      </button>
-
-    </div>
-
-  </header>
+</header>
 
 
-  <main class="main">
+<div class="container">
 
-    <div class="hero">
+<div class="hero">
 
-      <h2>Imagine. Create.</h2>
+<h1>
+Create <span class="orange">AI Images</span>
+</h1>
 
-      <p>
-        Turn your ideas into images with AI.
-      </p>
+<p>
+Turn your ideas into images
+</p>
 
-    </div>
-
-
-    <div class="generator">
-
-      <div class="label">
-        Main Prompt
-      </div>
-
-      <textarea
-        id="prompt"
-        placeholder="Describe the image you want to create..."
-      ></textarea>
+</div>
 
 
-      <div class="label" style="margin-top:18px;">
-        Aspect Ratio
-      </div>
+<!-- MODE -->
 
-      <div class="ratios">
+<div class="card">
 
-        <button class="ratio active" data-ratio="1:1">
-          1:1
-        </button>
+<label>Creation Mode</label>
 
-        <button class="ratio" data-ratio="16:9">
-          16:9
-        </button>
+<div class="modes">
 
-        <button class="ratio" data-ratio="9:16">
-          9:16
-        </button>
+<button
+class="mode active"
+data-mode="text"
+id="textMode">
 
-        <button class="ratio" data-ratio="4:5">
-          4:5
-        </button>
+🖼️ Text to Image
 
-        <button class="ratio" data-ratio="3:2">
-          3:2
-        </button>
+</button>
 
-        <button class="ratio" data-ratio="2:3">
-          2:3
-        </button>
+<button
+class="mode"
+data-mode="reference"
+id="referenceMode">
 
-      </div>
+📷 Reference Image
+
+</button>
+
+</div>
+
+</div>
 
 
-      <button
-        class="generateBtn"
-        id="generateBtn"
-        onclick="generateImage()"
-      >
-        ✨ Generate Image
-      </button>
+<!-- REFERENCE -->
+
+<div
+class="card"
+id="referenceCard"
+style="display:none"
+>
+
+<label>Reference Image</label>
+
+<label class="upload">
+
+<input
+type="file"
+id="referenceInput"
+accept="image/*"
+>
+
+<div class="upload-title">
+📷 Upload Reference Image
+</div>
+
+<div class="upload-sub">
+Choose an image from your gallery
+</div>
+
+</label>
+
+<div class="preview" id="preview">
+
+<img id="previewImage">
+
+<button
+class="remove"
+id="removeReference">
+
+Remove Image
+</button>
+
+</div>
+
+</div>
 
 
-      <div class="loading" id="loading">
+<!-- PROMPT -->
 
-        <div class="spinner"></div>
+<div class="card">
 
-        <div class="status">
-          Creating your image...
-        </div>
+<label>Main Prompt</label>
 
-      </div>
+<textarea
+id="prompt"
+placeholder="Describe the image you want to create..."
+></textarea>
+
+</div>
 
 
-      <div class="result" id="result">
+<!-- ASPECT RATIO -->
 
-        <img id="resultImage" src="" alt="Generated Image">
+<div class="card">
 
-        <div class="actions">
+<label>Aspect Ratio</label>
 
-          <button
-            class="actionBtn"
-            onclick="regenerateImage()"
-          >
-            🔄 Regenerate
-          </button>
+<div class="ratios">
 
-          <button
-            class="actionBtn"
-            onclick="downloadImage()"
-          >
-            ⬇ Download
-          </button>
+<button
+class="ratio active"
+data-ratio="1:1">
+1:1
+</button>
 
-        </div>
+<button
+class="ratio"
+data-ratio="16:9">
+16:9
+</button>
 
-      </div>
+<button
+class="ratio"
+data-ratio="9:16">
+9:16
+</button>
 
-    </div>
+<button
+class="ratio"
+data-ratio="4:5">
+4:5
+</button>
 
-  </main>
+<button
+class="ratio"
+data-ratio="3:2">
+3:2
+</button>
+
+<button
+class="ratio"
+data-ratio="2:3">
+2:3
+</button>
+
+</div>
+
+<button
+class="generate"
+id="generate">
+
+Generate Image
+</button>
+
+</div>
+
+
+<!-- ERROR -->
+
+<div
+class="error"
+id="error">
+</div>
+
+
+<!-- STATUS -->
+
+<div
+class="status"
+id="status">
+
+<div class="loader"></div>
+
+Generating your image...
+
+</div>
+
+
+<!-- RESULT -->
+
+<div
+class="card result"
+id="result">
+
+<label>Generated Image</label>
+
+<img
+id="image"
+alt="Generated AI Image"
+>
+
+<div class="actions">
+
+<button
+class="action"
+id="regenerate">
+
+🔄 Regenerate
+
+</button>
+
+<button
+class="action download"
+id="download">
+
+⬇️ Download
+
+</button>
+
+</div>
+
+</div>
+
+</div>
 
 </section>
 
 
-<script>
+<!-- FIREBASE -->
 
-let selectedRatio = "1:1";
-let lastPrompt = "";
+<script type="module">
+
+import {
+initializeApp
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import {
+getAuth,
+GoogleAuthProvider,
+signInWithPopup,
+onAuthStateChanged,
+signOut
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+
+const firebaseConfig = {
+
+apiKey:"AIzaSyDEBZ5NLY4PIUsF9D9A6mgqp_IHiY9Gy7c",
+
+authDomain:"ai-tc-4b59f.firebaseapp.com",
+
+projectId:"ai-tc-4b59f",
+
+storageBucket:"ai-tc-4b59f.firebasestorage.app",
+
+messagingSenderId:"755284292305",
+
+appId:"1:755284292305:web:07be472337304e93998bf0",
+
+measurementId:"G-NYRMHT1WNT"
+
+};
+
+
+const app=initializeApp(firebaseConfig);
+
+const auth=getAuth(app);
+
+const provider=new GoogleAuthProvider();
+
+
+const loginPage=document.getElementById("loginPage");
+
+const appPage=document.getElementById("appPage");
+
+const googleLogin=document.getElementById("googleLogin");
+
+const logout=document.getElementById("logout");
+
+const prompt=document.getElementById("prompt");
+
+const generate=document.getElementById("generate");
+
+const regenerate=document.getElementById("regenerate");
+
+const download=document.getElementById("download");
+
+const status=document.getElementById("status");
+
+const result=document.getElementById("result");
+
+const image=document.getElementById("image");
+
+const error=document.getElementById("error");
+
+const referenceMode=document.getElementById("referenceMode");
+
+const textMode=document.getElementById("textMode");
+
+const referenceCard=document.getElementById("referenceCard");
+
+const referenceInput=document.getElementById("referenceInput");
+
+const preview=document.getElementById("preview");
+
+const previewImage=document.getElementById("previewImage");
+
+const removeReference=document.getElementById("removeReference");
+
+
+let ratio="1:1";
+
+let mode="text";
+
+let referenceImage=null;
+
+let currentImage=null;
+
+
+/* GOOGLE LOGIN */
+
+googleLogin.onclick=async()=>{
+
+try{
+
+googleLogin.disabled=true;
+
+googleLogin.textContent="Connecting...";
+
+await signInWithPopup(auth,provider);
+
+}catch(e){
+
+showError("Google login failed.");
+
+googleLogin.disabled=false;
+
+googleLogin.textContent="Continue with Google";
+
+}
+
+};
+
+
+/* AUTH */
+
+onAuthStateChanged(auth,user=>{
+
+if(user){
+
+loginPage.style.display="none";
+
+appPage.style.display="block";
+
+}else{
+
+loginPage.style.display="flex";
+
+appPage.style.display="none";
+
+}
+
+});
+
+
+/* LOGOUT */
+
+logout.onclick=()=>signOut(auth);
+
+
+/* MODE */
+
+textMode.onclick=()=>{
+
+mode="text";
+
+textMode.classList.add("active");
+
+referenceMode.classList.remove("active");
+
+referenceCard.style.display="none";
+
+};
+
+
+referenceMode.onclick=()=>{
+
+mode="reference";
+
+referenceMode.classList.add("active");
+
+textMode.classList.remove("active");
+
+referenceCard.style.display="block";
+
+};
+
+
+/* REFERENCE IMAGE */
+
+referenceInput.onchange=()=>{
+
+const file=referenceInput.files[0];
+
+if(!file)return;
+
+if(!file.type.startsWith("image/")){
+
+showError("Please select an image.");
+
+return;
+
+}
+
+const reader=new FileReader();
+
+reader.onload=()=>{
+
+referenceImage=reader.result;
+
+previewImage.src=referenceImage;
+
+preview.style.display="block";
+
+hideError();
+
+};
+
+reader.readAsDataURL(file);
+
+};
+
+
+removeReference.onclick=()=>{
+
+referenceImage=null;
+
+referenceInput.value="";
+
+previewImage.src="";
+
+preview.style.display="none";
+
+};
 
 
 /* RATIO */
 
-document.querySelectorAll(".ratio").forEach(button => {
+document.querySelectorAll(".ratio").forEach(btn=>{
 
-  button.addEventListener("click", () => {
+btn.onclick=()=>{
 
-    document.querySelectorAll(".ratio")
-      .forEach(b => b.classList.remove("active"));
+document.querySelectorAll(".ratio")
+.forEach(x=>x.classList.remove("active"));
 
-    button.classList.add("active");
+btn.classList.add("active");
 
-    selectedRatio = button.dataset.ratio;
+ratio=btn.dataset.ratio;
 
-  });
+};
 
 });
 
 
 /* GENERATE */
 
-async function generateImage() {
+generate.onclick=createImage;
 
-  const prompt =
-    document.getElementById("prompt").value.trim();
-
-  if (!prompt) {
-
-    alert("Please enter a prompt.");
-
-    return;
-
-  }
-
-  lastPrompt = prompt;
-
-  const btn =
-    document.getElementById("generateBtn");
-
-  const loading =
-    document.getElementById("loading");
-
-  const result =
-    document.getElementById("result");
-
-  const resultImage =
-    document.getElementById("resultImage");
+regenerate.onclick=createImage;
 
 
-  btn.disabled = true;
+async function createImage(){
 
-  loading.style.display = "block";
+const text=prompt.value.trim();
 
-  result.style.display = "none";
+if(!text){
 
+showError("Please enter a prompt.");
 
-  try {
-
-    /*
-      Puter.js image generation
-    */
-
-    const image =
-      await puter.ai.txt2img(prompt, {
-        ratio: selectedRatio
-      });
-
-
-    if (!image) {
-
-      throw new Error(
-        "No image was returned."
-      );
-
-    }
-
-
-    let imageUrl = image;
-
-
-    if (typeof image === "object") {
-
-      imageUrl =
-        image.url ||
-        image.imageUrl ||
-        image.src ||
-        image.data;
-
-    }
-
-
-    if (!imageUrl) {
-
-      throw new Error(
-        "Image URL was not returned."
-      );
-
-    }
-
-
-    resultImage.src = imageUrl;
-
-    result.style.display = "block";
-
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "Image generation failed:\n\n" +
-      (error.message || error)
-    );
-
-  } finally {
-
-    btn.disabled = false;
-
-    loading.style.display = "none";
-
-  }
+return;
 
 }
 
 
-/* REGENERATE */
+if(mode==="reference" && !referenceImage){
 
-function regenerateImage() {
+showError("Please upload a reference image.");
 
-  if (lastPrompt) {
+return;
 
-    document.getElementById("prompt").value =
-      lastPrompt;
+}
 
-    generateImage();
 
-  }
+hideError();
+
+generate.disabled=true;
+
+regenerate.disabled=true;
+
+result.style.display="none";
+
+status.style.display="block";
+
+
+try{
+
+const response=await fetch(
+"/.netlify/functions/generate-image",
+{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+prompt:text,
+
+aspectRatio:ratio,
+
+mode:mode,
+
+referenceImage:referenceImage
+
+})
+
+});
+
+const data=await response.json();
+
+if(!response.ok)
+throw new Error(
+data.error||"Generation failed."
+);
+
+if(!data.image)
+throw new Error(
+"No image returned."
+);
+
+currentImage=data.image;
+
+image.src=currentImage;
+
+status.style.display="none";
+
+result.style.display="block";
+
+result.scrollIntoView({
+behavior:"smooth"
+});
+
+}catch(e){
+
+status.style.display="none";
+
+showError(e.message);
+
+}finally{
+
+generate.disabled=false;
+
+regenerate.disabled=false;
+
+}
 
 }
 
 
 /* DOWNLOAD */
 
-async function downloadImage() {
+download.onclick=()=>{
 
-  const imageUrl =
-    document.getElementById("resultImage").src;
+if(!currentImage)return;
 
-  if (!imageUrl) {
+const a=document.createElement("a");
 
-    alert("Generate an image first.");
+a.href=currentImage;
 
-    return;
+a.download="AI-TC-image.png";
 
-  }
+document.body.appendChild(a);
+
+a.click();
+
+a.remove();
+
+};
 
 
-  try {
+/* ERROR */
 
-    const response =
-      await fetch(imageUrl);
+function showError(text){
 
-    const blob =
-      await response.blob();
+error.textContent=text;
 
-    const url =
-      URL.createObjectURL(blob);
+error.style.display="block";
 
-    const link =
-      document.createElement("a");
+}
 
-    link.href = url;
+function hideError(){
 
-    link.download =
-      "AI-TC-image.png";
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    URL.revokeObjectURL(url);
-
-  } catch {
-
-    window.open(imageUrl, "_blank");
-
-  }
+error.style.display="none";
 
 }
 
