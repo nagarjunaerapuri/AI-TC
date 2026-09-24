@@ -3,12 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+const API_KEY = process.env.IMAGE_API_KEY;
 
-// Render Environment Variable
-const IMAGE_API_KEY = process.env.IMAGE_API_KEY;
-
-const API_URL =
-  "https://image.gen.hafiz.live/api/generate?format=json";
+const API_BASE = "https://image.gen.hafiz.live";
 
 function send(res, status, data, type = "application/json") {
   res.writeHead(status, {
@@ -21,37 +18,23 @@ function send(res, status, data, type = "application/json") {
   res.end(data);
 }
 
-function convertRatio(aspectRatio) {
-  switch (aspectRatio) {
-    case "16:9":
-      return "16:9";
+function ratio(value) {
+  const allowed = ["1:1", "16:9", "9:16", "4:3"];
 
-    case "9:16":
-      return "9:16";
-
-    case "4:3":
-      return "4:3";
-
-    case "1:1":
-    default:
-      return "1:1";
-  }
+  return allowed.includes(value)
+    ? value
+    : "1:1";
 }
 
-async function generateImage(prompt, aspectRatio) {
-
-  const response = await fetch(API_URL, {
-    method: "POST",
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
 
     headers: {
+      ...(options.headers || {}),
       "Content-Type": "application/json",
-      "X-API-Key": IMAGE_API_KEY
-    },
-
-    body: JSON.stringify({
-      prompt: prompt,
-      ratio_id: convertRatio(aspectRatio)
-    })
+      "X-API-Key": API_KEY
+    }
   });
 
   const text = await response.text();
@@ -77,21 +60,34 @@ async function generateImage(prompt, aspectRatio) {
   return data;
 }
 
-async function waitForImage(statusUrl) {
+async function generate(prompt, aspectRatio) {
+  return await apiRequest(
+    `${API_BASE}/api/generate?format=json`,
+    {
+      method: "POST",
 
-  for (let i = 0; i < 20; i++) {
+      body: JSON.stringify({
+        prompt: prompt,
+        ratio_id: ratio(aspectRatio)
+      })
+    }
+  );
+}
+
+async function pollGeneration(generationId) {
+
+  for (let attempt = 0; attempt < 12; attempt++) {
 
     await new Promise(resolve =>
-      setTimeout(resolve, 5000)
+      setTimeout(resolve, 7000)
     );
 
-    const response = await fetch(statusUrl, {
-      headers: {
-        "X-API-Key": IMAGE_API_KEY
+    const data = await apiRequest(
+      `${API_BASE}/api/generate/status/${generationId}`,
+      {
+        method: "GET"
       }
-    });
-
-    const data = await response.json();
+    );
 
     if (
       data.status === "completed" ||
@@ -114,7 +110,20 @@ async function waitForImage(statusUrl) {
   }
 
   throw new Error(
-    "Image generation took too long."
+    "Image generation timed out. Please try again."
+  );
+}
+
+function findImage(data) {
+
+  return (
+    data.previewUrl ||
+    data.downloadUrl ||
+    data.imageUrl ||
+    data.image ||
+    data.output ||
+    data.url ||
+    null
   );
 }
 
@@ -141,10 +150,10 @@ const server = http.createServer((req, res) => {
         res,
         200,
         file,
-        "text/html"
+        "text/html; charset=utf-8"
       );
 
-    } catch {
+    } catch (error) {
 
       return send(
         res,
@@ -156,10 +165,13 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // Image generation
+  // Generate image
   if (
     req.method === "POST" &&
-    req.url === "/.netlify/functions/generate-image"
+    (
+      req.url === "/.netlify/functions/generate-image" ||
+      req.url === "/api/generate-image"
+    )
   ) {
 
     let body = "";
@@ -177,8 +189,7 @@ const server = http.createServer((req, res) => {
 
       try {
 
-        // API key check
-        if (!IMAGE_API_KEY) {
+        if (!API_KEY) {
 
           return send(
             res,
@@ -190,9 +201,19 @@ const server = http.createServer((req, res) => {
           );
         }
 
-        const data = JSON.parse(
-          body || "{}"
-        );
+        let data;
+
+        try {
+          data = JSON.parse(body || "{}");
+        } catch {
+          return send(
+            res,
+            400,
+            JSON.stringify({
+              error: "Invalid JSON request."
+            })
+          );
+        }
 
         const prompt =
           String(data.prompt || "").trim();
@@ -206,37 +227,29 @@ const server = http.createServer((req, res) => {
             res,
             400,
             JSON.stringify({
-              error:
-                "Prompt is required."
+              error: "Prompt is required."
             })
           );
         }
 
-        // Generate image
-        const result =
-          await generateImage(
-            prompt,
-            aspectRatio
-          );
+        // Start generation
+        let result = await generate(
+          prompt,
+          aspectRatio
+        );
 
-        // Normal completed response
-        if (
-          result.previewUrl ||
-          result.downloadUrl
-        ) {
+        // Image immediately available
+        let image = findImage(result);
+
+        if (image) {
 
           return send(
             res,
             200,
             JSON.stringify({
-              image:
-                result.previewUrl ||
-                result.downloadUrl,
-
+              image: image,
               download:
-                result.downloadUrl ||
-                result.previewUrl,
-
+                result.downloadUrl || image,
               usage:
                 result.usage || null
             })
@@ -244,21 +257,29 @@ const server = http.createServer((req, res) => {
         }
 
         // Async generation
+        const generationId =
+          result.generationId ||
+          result.id;
+
         if (
-          result.statusUrl
+          result.status === "processing" ||
+          result.status === "pending" ||
+          result.status === "queued" ||
+          generationId
         ) {
 
-          const finalResult =
-            await waitForImage(
-              result.statusUrl
+          if (!generationId) {
+            throw new Error(
+              "Generation started but no generation ID was returned."
+            );
+          }
+
+          result =
+            await pollGeneration(
+              generationId
             );
 
-          const image =
-            finalResult.previewUrl ||
-            finalResult.downloadUrl ||
-            finalResult.imageUrl ||
-            finalResult.image ||
-            finalResult.output;
+          image = findImage(result);
 
           if (!image) {
             throw new Error(
@@ -271,55 +292,10 @@ const server = http.createServer((req, res) => {
             200,
             JSON.stringify({
               image: image,
-
               download:
-                finalResult.downloadUrl ||
-                image,
-
+                result.downloadUrl || image,
               usage:
-                finalResult.usage || null
-            })
-          );
-        }
-
-        // Another possible async format
-        if (
-          result.generationId
-        ) {
-
-          const statusUrl =
-            `https://image.gen.hafiz.live/api/generate/status/${result.generationId}`;
-
-          const finalResult =
-            await waitForImage(
-              statusUrl
-            );
-
-          const image =
-            finalResult.previewUrl ||
-            finalResult.downloadUrl ||
-            finalResult.imageUrl ||
-            finalResult.image ||
-            finalResult.output;
-
-          if (!image) {
-            throw new Error(
-              "Image URL was not returned."
-            );
-          }
-
-          return send(
-            res,
-            200,
-            JSON.stringify({
-              image: image,
-
-              download:
-                finalResult.downloadUrl ||
-                image,
-
-              usage:
-                finalResult.usage || null
+                result.usage || null
             })
           );
         }
@@ -330,7 +306,10 @@ const server = http.createServer((req, res) => {
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          "IMAGE GENERATION ERROR:",
+          error
+        );
 
         return send(
           res,
@@ -347,6 +326,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 404
   return send(
     res,
     404,
@@ -357,9 +337,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-
   console.log(
     `AI-TC running on port ${PORT}`
   );
-
 });
