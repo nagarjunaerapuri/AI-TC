@@ -7,13 +7,16 @@
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+
 body{
 font-family:Arial,sans-serif;
 background:#080808;
 color:#fff;
 min-height:100vh
 }
+
 button{font-family:inherit}
+
 #loginPage{
 min-height:100vh;
 display:flex;
@@ -21,6 +24,7 @@ align-items:center;
 justify-content:center;
 padding:20px
 }
+
 .box{
 width:100%;
 max-width:420px;
@@ -30,13 +34,19 @@ border-radius:22px;
 border:1px solid #ff790055;
 text-align:center
 }
+
 .logo{
 font-size:38px;
 font-weight:900;
 color:#ff7900;
 margin-bottom:10px
 }
-.box p{color:#999;margin:10px 0 25px}
+
+.box p{
+color:#999;
+margin:10px 0 25px
+}
+
 .google{
 width:100%;
 padding:15px;
@@ -46,7 +56,9 @@ font-weight:bold;
 font-size:16px;
 cursor:pointer
 }
+
 #appPage{display:none}
+
 header{
 height:64px;
 display:flex;
@@ -56,11 +68,13 @@ padding:0 16px;
 background:#101010;
 border-bottom:1px solid #292929
 }
+
 .logo2{
 font-size:24px;
 font-weight:900;
 color:#ff7900
 }
+
 .logout{
 background:#1b1b1b;
 color:#fff;
@@ -68,15 +82,27 @@ border:1px solid #333;
 padding:9px 13px;
 border-radius:9px
 }
+
 .container{
 max-width:850px;
 margin:auto;
 padding:25px 15px 50px
 }
-.hero{text-align:center;margin-bottom:25px}
-.hero h1{font-size:30px;margin-bottom:8px}
+
+.hero{
+text-align:center;
+margin-bottom:25px
+}
+
+.hero h1{
+font-size:30px;
+margin-bottom:8px
+}
+
 .orange{color:#ff7900}
+
 .hero p{color:#999}
+
 .card{
 background:#121212;
 border:1px solid #292929;
@@ -84,11 +110,39 @@ border-radius:18px;
 padding:18px;
 margin-bottom:20px
 }
+
 label{
 display:block;
 font-weight:bold;
 margin-bottom:10px
 }
+
+/* MODE */
+
+.modes{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px
+}
+
+.mode{
+padding:15px;
+background:#191919;
+border:1px solid #333;
+color:#ddd;
+border-radius:12px;
+font-weight:bold;
+cursor:pointer
+}
+
+.mode.active{
+background:#ff7900;
+color:#111;
+border-color:#ff7900
+}
+
+/* PROMPT */
+
 textarea{
 width:100%;
 height:160px;
@@ -101,25 +155,92 @@ font-size:16px;
 resize:vertical;
 outline:none
 }
-textarea:focus{border-color:#ff7900}
+
+textarea:focus{
+border-color:#ff7900
+}
+
+/* REFERENCE IMAGE */
+
+.upload{
+border:2px dashed #444;
+border-radius:14px;
+padding:25px 15px;
+text-align:center;
+cursor:pointer;
+background:#0b0b0b
+}
+
+.upload:hover{
+border-color:#ff7900
+}
+
+.upload input{
+display:none
+}
+
+.upload-title{
+font-size:17px;
+font-weight:bold;
+margin-bottom:7px
+}
+
+.upload-sub{
+color:#888;
+font-size:13px
+}
+
+.preview{
+display:none;
+margin-top:15px;
+position:relative
+}
+
+.preview img{
+width:100%;
+max-height:400px;
+object-fit:contain;
+border-radius:14px;
+background:#050505
+}
+
+.remove{
+margin-top:10px;
+width:100%;
+padding:10px;
+background:#222;
+color:#fff;
+border:1px solid #444;
+border-radius:10px;
+cursor:pointer
+}
+
+/* RATIOS */
+
 .ratios{
 display:grid;
 grid-template-columns:repeat(3,1fr);
 gap:9px
 }
+
 .ratio{
 padding:12px 5px;
 background:#191919;
 border:1px solid #333;
 color:#ddd;
-border-radius:10px
+border-radius:10px;
+cursor:pointer
 }
+
 .ratio.active{
 background:#ff7900;
 color:#111;
 border-color:#ff7900;
 font-weight:bold
 }
+
+/* GENERATE */
+
 .generate{
 width:100%;
 margin-top:18px;
@@ -131,13 +252,20 @@ font-size:18px;
 font-weight:900;
 cursor:pointer
 }
-.generate:disabled{opacity:.5}
+
+.generate:disabled{
+opacity:.5
+}
+
+/* STATUS */
+
 .status{
 display:none;
 text-align:center;
 color:#aaa;
 padding:20px
 }
+
 .loader{
 width:36px;
 height:36px;
@@ -147,121 +275,319 @@ border-top-color:#ff7900;
 border-radius:50%;
 animation:spin 1s linear infinite
 }
-@keyframes spin{to{transform:rotate(360deg)}}
-.result{display:none}
+
+@keyframes spin{
+to{transform:rotate(360deg)}
+}
+
+/* ERROR */
+
+.error{
+display:none;
+background:#351313;
+border:1px solid #7d2929;
+color:#ff8585;
+padding:12px;
+border-radius:10px;
+margin-bottom:15px;
+text-align:center
+}
+
+/* RESULT */
+
+.result{
+display:none
+}
+
 .result img{
 width:100%;
 display:block;
 border-radius:15px
 }
+
 .actions{
 display:grid;
 grid-template-columns:1fr 1fr;
 gap:10px;
 margin-top:12px
 }
+
 .action{
 padding:13px;
-border-radius:10px;
+border-radius:11px;
 border:1px solid #333;
-background:#1a1a1a;
+background:#191919;
 color:#fff;
-font-weight:bold
+font-weight:bold;
+cursor:pointer
 }
-.download{
+
+.action.download{
 background:#ff7900;
 color:#111;
 border-color:#ff7900
 }
-.error{
-display:none;
-background:#351414;
-color:#ffaaaa;
-padding:12px;
-border-radius:10px;
-margin-top:12px
-}
+
 @media(max-width:500px){
-.hero h1{font-size:25px}
-.ratios{grid-template-columns:repeat(2,1fr)}
+
+.hero h1{
+font-size:26px
+}
+
+.ratios{
+grid-template-columns:repeat(2,1fr)
+}
+
 }
 </style>
 </head>
 
 <body>
 
-<div id="loginPage">
+<!-- LOGIN -->
+
+<section id="loginPage">
+
 <div class="box">
+
 <div class="logo">AI TC</div>
-<h1>AI Image Generator</h1>
-<p>Create advanced AI images from your ideas.</p>
+
+<p>Create images with AI</p>
+
 <button class="google" id="googleLogin">
 Continue with Google
 </button>
-</div>
+
 </div>
 
-<div id="appPage">
+</section>
+
+
+<!-- APP -->
+
+<section id="appPage">
 
 <header>
+
 <div class="logo2">AI TC</div>
-<button class="logout" id="logout">Logout</button>
+
+<button class="logout" id="logout">
+Logout
+</button>
+
 </header>
+
 
 <div class="container">
 
 <div class="hero">
-<h1>Create with <span class="orange">AI</span></h1>
-<p>Turn your prompt into an AI-generated image.</p>
+
+<h1>
+Create <span class="orange">AI Images</span>
+</h1>
+
+<p>
+Turn your ideas into images
+</p>
+
 </div>
+
+
+<!-- MODE -->
+
+<div class="card">
+
+<label>Creation Mode</label>
+
+<div class="modes">
+
+<button
+class="mode active"
+data-mode="text"
+id="textMode">
+
+🖼️ Text to Image
+
+</button>
+
+<button
+class="mode"
+data-mode="reference"
+id="referenceMode">
+
+📷 Reference Image
+
+</button>
+
+</div>
+
+</div>
+
+
+<!-- REFERENCE -->
+
+<div
+class="card"
+id="referenceCard"
+style="display:none"
+>
+
+<label>Reference Image</label>
+
+<label class="upload">
+
+<input
+type="file"
+id="referenceInput"
+accept="image/*"
+>
+
+<div class="upload-title">
+📷 Upload Reference Image
+</div>
+
+<div class="upload-sub">
+Choose an image from your gallery
+</div>
+
+</label>
+
+<div class="preview" id="preview">
+
+<img id="previewImage">
+
+<button
+class="remove"
+id="removeReference">
+
+Remove Image
+</button>
+
+</div>
+
+</div>
+
+
+<!-- PROMPT -->
 
 <div class="card">
 
 <label>Main Prompt</label>
 
-<textarea id="prompt"
-placeholder="Describe exactly what you want to create..."></textarea>
+<textarea
+id="prompt"
+placeholder="Describe the image you want to create..."
+></textarea>
 
-<label style="margin-top:18px">Aspect Ratio</label>
+</div>
+
+
+<!-- ASPECT RATIO -->
+
+<div class="card">
+
+<label>Aspect Ratio</label>
 
 <div class="ratios">
 
-<button class="ratio active" data-ratio="1:1">1:1</button>
-<button class="ratio" data-ratio="16:9">16:9</button>
-<button class="ratio" data-ratio="9:16">9:16</button>
-<button class="ratio" data-ratio="4:5">4:5</button>
-<button class="ratio" data-ratio="3:2">3:2</button>
-<button class="ratio" data-ratio="2:3">2:3</button>
-
-</div>
-
-<button class="generate" id="generate">
-✨ Generate Image
+<button
+class="ratio active"
+data-ratio="1:1">
+1:1
 </button>
 
-<div class="error" id="error"></div>
+<button
+class="ratio"
+data-ratio="16:9">
+16:9
+</button>
+
+<button
+class="ratio"
+data-ratio="9:16">
+9:16
+</button>
+
+<button
+class="ratio"
+data-ratio="4:5">
+4:5
+</button>
+
+<button
+class="ratio"
+data-ratio="3:2">
+3:2
+</button>
+
+<button
+class="ratio"
+data-ratio="2:3">
+2:3
+</button>
 
 </div>
 
-<div class="status" id="status">
+<button
+class="generate"
+id="generate">
+
+Generate Image
+</button>
+
+</div>
+
+
+<!-- ERROR -->
+
+<div
+class="error"
+id="error">
+</div>
+
+
+<!-- STATUS -->
+
+<div
+class="status"
+id="status">
+
 <div class="loader"></div>
-<div>Creating your image...</div>
+
+Generating your image...
+
 </div>
 
-<div class="card result" id="result">
+
+<!-- RESULT -->
+
+<div
+class="card result"
+id="result">
 
 <label>Generated Image</label>
 
-<img id="image">
+<img
+id="image"
+alt="Generated AI Image"
+>
 
 <div class="actions">
 
-<button class="action download" id="download">
-⬇ Download
-</button>
+<button
+class="action"
+id="regenerate">
 
-<button class="action" id="regenerate">
 🔄 Regenerate
+
+</button>
+
+<button
+class="action download"
+id="download">
+
+⬇️ Download
+
 </button>
 
 </div>
@@ -269,59 +595,109 @@ placeholder="Describe exactly what you want to create..."></textarea>
 </div>
 
 </div>
-</div>
+
+</section>
+
+
+<!-- FIREBASE -->
 
 <script type="module">
 
-import{initializeApp}
-from"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {
+initializeApp
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
-import{
+import {
 getAuth,
 GoogleAuthProvider,
 signInWithPopup,
 onAuthStateChanged,
 signOut
-}
-from"https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
 
-const firebaseConfig={
+const firebaseConfig = {
+
 apiKey:"AIzaSyDEBZ5NLY4PIUsF9D9A6mgqp_IHiY9Gy7c",
+
 authDomain:"ai-tc-4b59f.firebaseapp.com",
+
 projectId:"ai-tc-4b59f",
+
 storageBucket:"ai-tc-4b59f.firebasestorage.app",
+
 messagingSenderId:"755284292305",
+
 appId:"1:755284292305:web:07be472337304e93998bf0",
+
 measurementId:"G-NYRMHT1WNT"
+
 };
 
+
 const app=initializeApp(firebaseConfig);
+
 const auth=getAuth(app);
+
 const provider=new GoogleAuthProvider();
 
+
 const loginPage=document.getElementById("loginPage");
+
 const appPage=document.getElementById("appPage");
+
 const googleLogin=document.getElementById("googleLogin");
+
 const logout=document.getElementById("logout");
+
 const prompt=document.getElementById("prompt");
+
 const generate=document.getElementById("generate");
+
 const regenerate=document.getElementById("regenerate");
-const status=document.getElementById("status");
-const result=document.getElementById("result");
-const image=document.getElementById("image");
+
 const download=document.getElementById("download");
+
+const status=document.getElementById("status");
+
+const result=document.getElementById("result");
+
+const image=document.getElementById("image");
+
 const error=document.getElementById("error");
 
-let ratio="1:1";
-let currentImage="";
+const referenceMode=document.getElementById("referenceMode");
 
+const textMode=document.getElementById("textMode");
+
+const referenceCard=document.getElementById("referenceCard");
+
+const referenceInput=document.getElementById("referenceInput");
+
+const preview=document.getElementById("preview");
+
+const previewImage=document.getElementById("previewImage");
+
+const removeReference=document.getElementById("removeReference");
+
+
+let ratio="1:1";
+
+let mode="text";
+
+let referenceImage=null;
+
+let currentImage=null;
+
+
+/* GOOGLE LOGIN */
 
 googleLogin.onclick=async()=>{
 
 try{
 
 googleLogin.disabled=true;
+
 googleLogin.textContent="Connecting...";
 
 await signInWithPopup(auth,provider);
@@ -331,6 +707,7 @@ await signInWithPopup(auth,provider);
 showError("Google login failed.");
 
 googleLogin.disabled=false;
+
 googleLogin.textContent="Continue with Google";
 
 }
@@ -338,16 +715,20 @@ googleLogin.textContent="Continue with Google";
 };
 
 
+/* AUTH */
+
 onAuthStateChanged(auth,user=>{
 
 if(user){
 
 loginPage.style.display="none";
+
 appPage.style.display="block";
 
 }else{
 
 loginPage.style.display="flex";
+
 appPage.style.display="none";
 
 }
@@ -355,8 +736,88 @@ appPage.style.display="none";
 });
 
 
+/* LOGOUT */
+
 logout.onclick=()=>signOut(auth);
 
+
+/* MODE */
+
+textMode.onclick=()=>{
+
+mode="text";
+
+textMode.classList.add("active");
+
+referenceMode.classList.remove("active");
+
+referenceCard.style.display="none";
+
+};
+
+
+referenceMode.onclick=()=>{
+
+mode="reference";
+
+referenceMode.classList.add("active");
+
+textMode.classList.remove("active");
+
+referenceCard.style.display="block";
+
+};
+
+
+/* REFERENCE IMAGE */
+
+referenceInput.onchange=()=>{
+
+const file=referenceInput.files[0];
+
+if(!file)return;
+
+if(!file.type.startsWith("image/")){
+
+showError("Please select an image.");
+
+return;
+
+}
+
+const reader=new FileReader();
+
+reader.onload=()=>{
+
+referenceImage=reader.result;
+
+previewImage.src=referenceImage;
+
+preview.style.display="block";
+
+hideError();
+
+};
+
+reader.readAsDataURL(file);
+
+};
+
+
+removeReference.onclick=()=>{
+
+referenceImage=null;
+
+referenceInput.value="";
+
+previewImage.src="";
+
+preview.style.display="none";
+
+};
+
+
+/* RATIO */
 
 document.querySelectorAll(".ratio").forEach(btn=>{
 
@@ -374,7 +835,10 @@ ratio=btn.dataset.ratio;
 });
 
 
+/* GENERATE */
+
 generate.onclick=createImage;
+
 regenerate.onclick=createImage;
 
 
@@ -385,46 +849,76 @@ const text=prompt.value.trim();
 if(!text){
 
 showError("Please enter a prompt.");
+
 return;
 
 }
 
+
+if(mode==="reference" && !referenceImage){
+
+showError("Please upload a reference image.");
+
+return;
+
+}
+
+
 hideError();
 
 generate.disabled=true;
+
 regenerate.disabled=true;
 
 result.style.display="none";
+
 status.style.display="block";
+
 
 try{
 
 const response=await fetch(
 "/.netlify/functions/generate-image",
 {
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
 body:JSON.stringify({
+
 prompt:text,
-aspectRatio:ratio
+
+aspectRatio:ratio,
+
+mode:mode,
+
+referenceImage:referenceImage
+
 })
-}
-);
+
+});
 
 const data=await response.json();
 
 if(!response.ok)
-throw new Error(data.error||"Generation failed.");
+throw new Error(
+data.error||"Generation failed."
+);
 
 if(!data.image)
-throw new Error("No image returned.");
+throw new Error(
+"No image returned."
+);
 
 currentImage=data.image;
+
 image.src=currentImage;
 
 status.style.display="none";
+
 result.style.display="block";
 
 result.scrollIntoView({
@@ -434,17 +928,21 @@ behavior:"smooth"
 }catch(e){
 
 status.style.display="none";
+
 showError(e.message);
 
 }finally{
 
 generate.disabled=false;
+
 regenerate.disabled=false;
 
 }
 
 }
 
+
+/* DOWNLOAD */
 
 download.onclick=()=>{
 
@@ -453,18 +951,24 @@ if(!currentImage)return;
 const a=document.createElement("a");
 
 a.href=currentImage;
+
 a.download="AI-TC-image.png";
 
 document.body.appendChild(a);
+
 a.click();
+
 a.remove();
 
 };
 
 
+/* ERROR */
+
 function showError(text){
 
 error.textContent=text;
+
 error.style.display="block";
 
 }
