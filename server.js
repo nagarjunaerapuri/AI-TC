@@ -3,7 +3,12 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
-const PIXAZO_API_KEY = process.env.PIXAZO_API_KEY;
+
+// Render Environment Variable
+const IMAGE_API_KEY = process.env.IMAGE_API_KEY;
+
+const API_URL =
+  "https://image.gen.hafiz.live/api/generate?format=json";
 
 function send(res, status, data, type = "application/json") {
   res.writeHead(status, {
@@ -12,40 +17,41 @@ function send(res, status, data, type = "application/json") {
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
   });
+
   res.end(data);
 }
 
-function getSize(aspectRatio) {
+function convertRatio(aspectRatio) {
   switch (aspectRatio) {
     case "16:9":
-      return { width: 1024, height: 576 };
+      return "16:9";
 
     case "9:16":
-      return { width: 576, height: 1024 };
+      return "9:16";
 
-    case "4:5":
-      return { width: 819, height: 1024 };
+    case "4:3":
+      return "4:3";
 
-    case "3:2":
-      return { width: 1024, height: 683 };
-
-    case "2:3":
-      return { width: 683, height: 1024 };
-
+    case "1:1":
     default:
-      return { width: 1024, height: 1024 };
+      return "1:1";
   }
 }
 
-async function pixazoRequest(url, body) {
-  const response = await fetch(url, {
+async function generateImage(prompt, aspectRatio) {
+
+  const response = await fetch(API_URL, {
     method: "POST",
+
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
-      "Ocp-Apim-Subscription-Key": PIXAZO_API_KEY
+      "X-API-Key": IMAGE_API_KEY
     },
-    body: JSON.stringify(body)
+
+    body: JSON.stringify({
+      prompt: prompt,
+      ratio_id: convertRatio(aspectRatio)
+    })
   });
 
   const text = await response.text();
@@ -56,38 +62,90 @@ async function pixazoRequest(url, body) {
     data = JSON.parse(text);
   } catch {
     throw new Error(
-      "Pixazo returned an invalid response: " + text.slice(0, 300)
+      "Image API returned an invalid response."
     );
   }
 
   if (!response.ok) {
     throw new Error(
-      data.message ||
       data.error ||
-      `Pixazo API error: ${response.status}`
+      data.message ||
+      `Image API error: ${response.status}`
     );
   }
 
   return data;
 }
 
+async function waitForImage(statusUrl) {
+
+  for (let i = 0; i < 20; i++) {
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 5000)
+    );
+
+    const response = await fetch(statusUrl, {
+      headers: {
+        "X-API-Key": IMAGE_API_KEY
+      }
+    });
+
+    const data = await response.json();
+
+    if (
+      data.status === "completed" ||
+      data.status === "complete" ||
+      data.status === "success"
+    ) {
+      return data;
+    }
+
+    if (
+      data.status === "failed" ||
+      data.status === "error"
+    ) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        "Image generation failed."
+      );
+    }
+  }
+
+  throw new Error(
+    "Image generation took too long."
+  );
+}
+
 const server = http.createServer((req, res) => {
 
-  // CORS preflight
+  // CORS
   if (req.method === "OPTIONS") {
     return send(res, 204, "");
   }
 
-  // Open website
-  if (req.method === "GET" && req.url === "/") {
+  // Website
+  if (
+    req.method === "GET" &&
+    (req.url === "/" || req.url === "/index.html")
+  ) {
+
     try {
+
       const file = fs.readFileSync(
         path.join(__dirname, "index.html")
       );
 
-      return send(res, 200, file, "text/html");
+      return send(
+        res,
+        200,
+        file,
+        "text/html"
+      );
 
-    } catch (error) {
+    } catch {
+
       return send(
         res,
         500,
@@ -98,7 +156,7 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // Generate image
+  // Image generation
   if (
     req.method === "POST" &&
     req.url === "/.netlify/functions/generate-image"
@@ -107,9 +165,9 @@ const server = http.createServer((req, res) => {
     let body = "";
 
     req.on("data", chunk => {
+
       body += chunk;
 
-      // Prevent extremely large requests
       if (body.length > 35 * 1024 * 1024) {
         req.destroy();
       }
@@ -119,74 +177,92 @@ const server = http.createServer((req, res) => {
 
       try {
 
-        if (!PIXAZO_API_KEY) {
+        // API key check
+        if (!IMAGE_API_KEY) {
+
           return send(
             res,
             500,
             JSON.stringify({
               error:
-                "PIXAZO_API_KEY is missing in Render Environment."
+                "IMAGE_API_KEY is missing in Render Environment."
             })
           );
         }
 
-        const data = JSON.parse(body || "{}");
+        const data = JSON.parse(
+          body || "{}"
+        );
 
-        const prompt = String(data.prompt || "").trim();
-        const aspectRatio = data.aspectRatio || "1:1";
-        const mode = data.mode || "text";
-        const referenceImage = data.referenceImage || "";
+        const prompt =
+          String(data.prompt || "").trim();
+
+        const aspectRatio =
+          data.aspectRatio || "1:1";
 
         if (!prompt) {
+
           return send(
             res,
             400,
             JSON.stringify({
-              error: "Prompt is required."
+              error:
+                "Prompt is required."
             })
           );
         }
 
-        /*
-        ============================================
-        TEXT TO IMAGE
-        Stable Diffusion XL Lightning
-        ============================================
-        */
-
-        if (mode === "text") {
-
-          const size = getSize(aspectRatio);
-
-          const result = await pixazoRequest(
-            "https://gateway.pixazo.ai/sdxl_lightning/getImage/v1/getSDXLImage",
-            {
-              prompt: prompt,
-
-              negativePrompt:
-                "blurry, low quality, distorted, deformed, watermark, logo",
-
-              width: size.width,
-              height: size.height,
-
-              num_steps: 20,
-              guidance: 7.5,
-
-              seed: Math.floor(
-                Math.random() * 2147483647
-              )
-            }
+        // Generate image
+        const result =
+          await generateImage(
+            prompt,
+            aspectRatio
           );
 
-          const imageUrl =
-            result.imageUrl ||
-            result.output ||
-            result.image ||
-            result.url;
+        // Normal completed response
+        if (
+          result.previewUrl ||
+          result.downloadUrl
+        ) {
 
-          if (!imageUrl) {
+          return send(
+            res,
+            200,
+            JSON.stringify({
+              image:
+                result.previewUrl ||
+                result.downloadUrl,
+
+              download:
+                result.downloadUrl ||
+                result.previewUrl,
+
+              usage:
+                result.usage || null
+            })
+          );
+        }
+
+        // Async generation
+        if (
+          result.statusUrl
+        ) {
+
+          const finalResult =
+            await waitForImage(
+              result.statusUrl
+            );
+
+          const image =
+            finalResult.previewUrl ||
+            finalResult.downloadUrl ||
+            finalResult.imageUrl ||
+            finalResult.image ||
+            finalResult.output;
+
+          if (!image) {
             throw new Error(
-              "Pixazo did not return an image URL."
+              "Image URL was not returned."
             );
           }
 
@@ -194,64 +270,41 @@ const server = http.createServer((req, res) => {
             res,
             200,
             JSON.stringify({
-              image: imageUrl
+              image: image,
+
+              download:
+                finalResult.downloadUrl ||
+                image,
+
+              usage:
+                finalResult.usage || null
             })
           );
         }
 
-        /*
-        ============================================
-        REFERENCE IMAGE
-        Stable Diffusion 3.5 Image-to-Image
-        ============================================
-        */
+        // Another possible async format
+        if (
+          result.generationId
+        ) {
 
-        if (mode === "reference") {
+          const statusUrl =
+            `https://image.gen.hafiz.live/api/generate/status/${result.generationId}`;
 
-          if (!referenceImage) {
-            return send(
-              res,
-              400,
-              JSON.stringify({
-                error:
-                  "Please upload a reference image first."
-              })
+          const finalResult =
+            await waitForImage(
+              statusUrl
             );
-          }
 
-          /*
-          Pixazo's SD 3.5 API accepts an image
-          reference together with the prompt.
-          */
+          const image =
+            finalResult.previewUrl ||
+            finalResult.downloadUrl ||
+            finalResult.imageUrl ||
+            finalResult.image ||
+            finalResult.output;
 
-          const result = await pixazoRequest(
-            "https://gateway.pixazo.ai/sd3-5/v1/r-sd-3-5-large",
-            {
-              prompt: prompt,
-
-              image: referenceImage,
-
-              prompt_strength: 0.75,
-
-              cfg: 5,
-
-              steps: 30,
-
-              output_format: "webp",
-
-              output_quality: 90
-            }
-          );
-
-          const imageUrl =
-            result.output ||
-            result.imageUrl ||
-            result.image ||
-            result.url;
-
-          if (!imageUrl) {
+          if (!image) {
             throw new Error(
-              "Pixazo did not return the reference image result."
+              "Image URL was not returned."
             );
           }
 
@@ -259,17 +312,20 @@ const server = http.createServer((req, res) => {
             res,
             200,
             JSON.stringify({
-              image: imageUrl
+              image: image,
+
+              download:
+                finalResult.downloadUrl ||
+                image,
+
+              usage:
+                finalResult.usage || null
             })
           );
         }
 
-        return send(
-          res,
-          400,
-          JSON.stringify({
-            error: "Invalid generation mode."
-          })
+        throw new Error(
+          "Image URL was not returned by the API."
         );
 
       } catch (error) {
@@ -301,7 +357,9 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
+
   console.log(
     `AI-TC running on port ${PORT}`
   );
+
 });
