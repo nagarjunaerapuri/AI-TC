@@ -3,16 +3,80 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+const PIXAZO_API_KEY = process.env.PIXAZO_API_KEY;
 
 function send(res, status, data, type = "application/json") {
   res.writeHead(status, {
     "Content-Type": type,
-    "Access-Control-Allow-Origin": "*"
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
   });
   res.end(data);
 }
 
+function getSize(aspectRatio) {
+  switch (aspectRatio) {
+    case "16:9":
+      return { width: 1024, height: 576 };
+
+    case "9:16":
+      return { width: 576, height: 1024 };
+
+    case "4:5":
+      return { width: 819, height: 1024 };
+
+    case "3:2":
+      return { width: 1024, height: 683 };
+
+    case "2:3":
+      return { width: 683, height: 1024 };
+
+    default:
+      return { width: 1024, height: 1024 };
+  }
+}
+
+async function pixazoRequest(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+      "Ocp-Apim-Subscription-Key": PIXAZO_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      "Pixazo returned an invalid response: " + text.slice(0, 300)
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.message ||
+      data.error ||
+      `Pixazo API error: ${response.status}`
+    );
+  }
+
+  return data;
+}
+
 const server = http.createServer((req, res) => {
+
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return send(res, 204, "");
+  }
 
   // Open website
   if (req.method === "GET" && req.url === "/") {
@@ -44,16 +108,34 @@ const server = http.createServer((req, res) => {
 
     req.on("data", chunk => {
       body += chunk;
+
+      // Prevent extremely large requests
+      if (body.length > 35 * 1024 * 1024) {
+        req.destroy();
+      }
     });
 
     req.on("end", async () => {
 
       try {
 
+        if (!PIXAZO_API_KEY) {
+          return send(
+            res,
+            500,
+            JSON.stringify({
+              error:
+                "PIXAZO_API_KEY is missing in Render Environment."
+            })
+          );
+        }
+
         const data = JSON.parse(body || "{}");
 
-        const prompt = data.prompt;
+        const prompt = String(data.prompt || "").trim();
         const aspectRatio = data.aspectRatio || "1:1";
+        const mode = data.mode || "text";
+        const referenceImage = data.referenceImage || "";
 
         if (!prompt) {
           return send(
@@ -65,77 +147,134 @@ const server = http.createServer((req, res) => {
           );
         }
 
-        // Aspect ratio → image dimensions
-        let width = 1024;
-        let height = 1024;
+        /*
+        ============================================
+        TEXT TO IMAGE
+        Stable Diffusion XL Lightning
+        ============================================
+        */
 
-        if (aspectRatio === "16:9") {
-          width = 1280;
-          height = 720;
-        }
+        if (mode === "text") {
 
-        if (aspectRatio === "9:16") {
-          width = 720;
-          height = 1280;
-        }
+          const size = getSize(aspectRatio);
 
-        if (aspectRatio === "4:5") {
-          width = 1024;
-          height = 1280;
-        }
+          const result = await pixazoRequest(
+            "https://gateway.pixazo.ai/sdxl_lightning/getImage/v1/getSDXLImage",
+            {
+              prompt: prompt,
 
-        if (aspectRatio === "3:2") {
-          width = 1152;
-          height = 768;
-        }
+              negativePrompt:
+                "blurry, low quality, distorted, deformed, watermark, logo",
 
-        if (aspectRatio === "2:3") {
-          width = 768;
-          height = 1152;
-        }
+              width: size.width,
+              height: size.height,
 
-        const finalPrompt =
-          "Create a high quality image based on this user prompt: " +
-          prompt;
+              num_steps: 20,
+              guidance: 7.5,
 
-        const imageUrl =
-          "https://image.pollinations.ai/prompt/" +
-          encodeURIComponent(finalPrompt) +
-          "?width=" +
-          width +
-          "&height=" +
-          height +
-          "&nologo=true";
+              seed: Math.floor(
+                Math.random() * 2147483647
+              )
+            }
+          );
 
-        const imageResponse = await fetch(imageUrl);
+          const imageUrl =
+            result.imageUrl ||
+            result.output ||
+            result.image ||
+            result.url;
 
-        if (!imageResponse.ok) {
-          throw new Error(
-            "Image generation failed: " +
-            imageResponse.status
+          if (!imageUrl) {
+            throw new Error(
+              "Pixazo did not return an image URL."
+            );
+          }
+
+          return send(
+            res,
+            200,
+            JSON.stringify({
+              image: imageUrl
+            })
           );
         }
 
-        const imageBuffer =
-          Buffer.from(
-            await imageResponse.arrayBuffer()
+        /*
+        ============================================
+        REFERENCE IMAGE
+        Stable Diffusion 3.5 Image-to-Image
+        ============================================
+        */
+
+        if (mode === "reference") {
+
+          if (!referenceImage) {
+            return send(
+              res,
+              400,
+              JSON.stringify({
+                error:
+                  "Please upload a reference image first."
+              })
+            );
+          }
+
+          /*
+          Pixazo's SD 3.5 API accepts an image
+          reference together with the prompt.
+          */
+
+          const result = await pixazoRequest(
+            "https://gateway.pixazo.ai/sd3-5/v1/r-sd-3-5-large",
+            {
+              prompt: prompt,
+
+              image: referenceImage,
+
+              prompt_strength: 0.75,
+
+              cfg: 5,
+
+              steps: 30,
+
+              output_format: "webp",
+
+              output_quality: 90
+            }
           );
 
-        const base64 =
-          imageBuffer.toString("base64");
+          const imageUrl =
+            result.output ||
+            result.imageUrl ||
+            result.image ||
+            result.url;
 
-        const image =
-          "data:image/jpeg;base64," + base64;
+          if (!imageUrl) {
+            throw new Error(
+              "Pixazo did not return the reference image result."
+            );
+          }
+
+          return send(
+            res,
+            200,
+            JSON.stringify({
+              image: imageUrl
+            })
+          );
+        }
 
         return send(
           res,
-          200,
+          400,
           JSON.stringify({
-            image: image
+            error: "Invalid generation mode."
           })
         );
 
       } catch (error) {
+
+        console.error(error);
 
         return send(
           res,
@@ -146,9 +285,7 @@ const server = http.createServer((req, res) => {
               "Image generation failed."
           })
         );
-
       }
-
     });
 
     return;
