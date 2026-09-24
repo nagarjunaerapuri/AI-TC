@@ -9,31 +9,21 @@ function send(res, status, data, type = "application/json") {
     "Content-Type": type,
     "Access-Control-Allow-Origin": "*"
   });
-
   res.end(data);
 }
 
 const server = http.createServer((req, res) => {
 
-  // =========================
-  // OPEN WEBSITE
-  // =========================
-
+  // Open website
   if (req.method === "GET" && req.url === "/") {
     try {
       const file = fs.readFileSync(
         path.join(__dirname, "index.html")
       );
 
-      return send(
-        res,
-        200,
-        file,
-        "text/html"
-      );
+      return send(res, 200, file, "text/html");
 
     } catch (error) {
-
       return send(
         res,
         500,
@@ -44,11 +34,7 @@ const server = http.createServer((req, res) => {
     }
   }
 
-
-  // =========================
-  // IMAGE GENERATION
-  // =========================
-
+  // Generate image
   if (
     req.method === "POST" &&
     req.url === "/.netlify/functions/generate-image"
@@ -64,24 +50,12 @@ const server = http.createServer((req, res) => {
 
       try {
 
-        // =========================
-        // READ USER DATA
-        // =========================
-
         const data = JSON.parse(body || "{}");
 
         const prompt = data.prompt;
-
-        const aspectRatio =
-          data.aspectRatio || "1:1";
-
-
-        // =========================
-        // CHECK PROMPT
-        // =========================
+        const aspectRatio = data.aspectRatio || "1:1";
 
         if (!prompt) {
-
           return send(
             res,
             400,
@@ -89,222 +63,88 @@ const server = http.createServer((req, res) => {
               error: "Prompt is required."
             })
           );
-
         }
 
+        // Aspect ratio → image dimensions
+        let width = 1024;
+        let height = 1024;
 
-        // =========================
-        // GET GEMINI API KEY
-        // =========================
-
-        const apiKey =
-          (process.env.GEMINI_API_KEY || "")
-            .replace(/\r?\n/g, "")
-            .trim();
-
-
-        if (!apiKey) {
-
-          return send(
-            res,
-            500,
-            JSON.stringify({
-              error: "GEMINI_API_KEY is not configured."
-            })
-          );
-
+        if (aspectRatio === "16:9") {
+          width = 1280;
+          height = 720;
         }
 
-
-        // =========================
-        // GEMINI REQUEST
-        // =========================
-
-        const requestBody = {
-
-          contents: [
-            {
-              parts: [
-                {
-                  text:
-                    "Create a high-quality professional AI-generated image based on the user's request. Understand the prompt in its original language. Follow the subject, composition, lighting, environment, details and requested aspect ratio carefully. Create a polished professional image. User request: " +
-                    prompt
-                }
-              ]
-            }
-          ],
-
-          generationConfig: {
-
-            responseModalities: [
-              "IMAGE"
-            ],
-
-            imageConfig: {
-
-              aspectRatio: aspectRatio,
-
-              imageSize: "2K"
-
-            }
-
-          }
-
-        };
-
-
-        // =========================
-        // CALL GEMINI API
-        // =========================
-
-        const response = await fetch(
-
-          "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent",
-
-          {
-            method: "POST",
-
-            headers: {
-
-              "Content-Type":
-                "application/json",
-
-              "x-goog-api-key":
-                apiKey
-
-            },
-
-            body:
-              JSON.stringify(requestBody)
-
-          }
-
-        );
-
-
-        // =========================
-        // READ GEMINI RESPONSE
-        // =========================
-
-        const result =
-          await response.json();
-
-
-        // =========================
-        // GEMINI ERROR
-        // =========================
-
-        if (!response.ok) {
-
-          return send(
-
-            res,
-
-            response.status,
-
-            JSON.stringify({
-
-              error:
-                result?.error?.message ||
-                "Gemini API error."
-
-            })
-
-          );
-
+        if (aspectRatio === "9:16") {
+          width = 720;
+          height = 1280;
         }
 
-
-        // =========================
-        // FIND IMAGE
-        // =========================
-
-        const parts =
-          result?.candidates?.[0]
-            ?.content?.parts || [];
-
-
-        const imagePart =
-          parts.find(
-            part => part.inlineData
-          );
-
-
-        // =========================
-        // NO IMAGE
-        // =========================
-
-        if (!imagePart) {
-
-          return send(
-
-            res,
-
-            500,
-
-            JSON.stringify({
-
-              error:
-                "Gemini did not return an image."
-
-            })
-
-          );
-
+        if (aspectRatio === "4:5") {
+          width = 1024;
+          height = 1280;
         }
 
+        if (aspectRatio === "3:2") {
+          width = 1152;
+          height = 768;
+        }
 
-        // =========================
-        // IMAGE DATA
-        // =========================
+        if (aspectRatio === "2:3") {
+          width = 768;
+          height = 1152;
+        }
 
-        const mimeType =
-          imagePart.inlineData.mimeType ||
-          "image/png";
+        const finalPrompt =
+          "Create a high quality image based on this user prompt: " +
+          prompt;
 
+        const imageUrl =
+          "https://image.pollinations.ai/prompt/" +
+          encodeURIComponent(finalPrompt) +
+          "?width=" +
+          width +
+          "&height=" +
+          height +
+          "&nologo=true";
+
+        const imageResponse = await fetch(imageUrl);
+
+        if (!imageResponse.ok) {
+          throw new Error(
+            "Image generation failed: " +
+            imageResponse.status
+          );
+        }
+
+        const imageBuffer =
+          Buffer.from(
+            await imageResponse.arrayBuffer()
+          );
 
         const base64 =
-          imagePart.inlineData.data;
-
+          imageBuffer.toString("base64");
 
         const image =
-          `data:${mimeType};base64,${base64}`;
-
-
-        // =========================
-        // SEND IMAGE TO WEBSITE
-        // =========================
+          "data:image/jpeg;base64," + base64;
 
         return send(
-
           res,
-
           200,
-
           JSON.stringify({
-
             image: image
-
           })
-
         );
 
       } catch (error) {
 
         return send(
-
           res,
-
           500,
-
           JSON.stringify({
-
             error:
               error.message ||
-              "Server error."
-
+              "Image generation failed."
           })
-
         );
 
       }
@@ -314,39 +154,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-
-  // =========================
-  // NOT FOUND
-  // =========================
-
   return send(
-
     res,
-
     404,
-
     JSON.stringify({
-
       error: "Not found"
-
     })
-
   );
-
 });
 
-
-// =========================
-// START SERVER
-// =========================
-
-server.listen(
-  PORT,
-  () => {
-
-    console.log(
-      `AI-TC running on port ${PORT}`
-    );
-
-  }
-);
+server.listen(PORT, () => {
+  console.log(
+    `AI-TC running on port ${PORT}`
+  );
+});
