@@ -3,341 +3,286 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.IMAGE_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const API_BASE = "https://image.gen.hafiz.live";
+// Gemini image generation model
+const MODEL = "gemini-3.1-flash-image";
 
-function send(res, status, data, type = "application/json") {
+function sendJSON(res, status, data) {
   res.writeHead(status, {
-    "Content-Type": type,
+    "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
   });
 
-  res.end(data);
+  res.end(JSON.stringify(data));
 }
 
-function ratio(value) {
-  const allowed = ["1:1", "16:9", "9:16", "4:3"];
+function getAspectRatio(ratio) {
+  const allowed = [
+    "1:1",
+    "16:9",
+    "9:16",
+    "4:5",
+    "3:2",
+    "2:3",
+    "4:3",
+    "21:9"
+  ];
 
-  return allowed.includes(value)
-    ? value
-    : "1:1";
+  return allowed.includes(ratio) ? ratio : "1:1";
 }
 
-async function apiRequest(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
+function cleanBase64(value) {
+  if (!value) return null;
 
-    headers: {
-      ...(options.headers || {}),
-      "Content-Type": "application/json",
-      "X-API-Key": API_KEY
-    }
+  if (value.includes(",")) {
+    return value.split(",")[1];
+  }
+
+  return value;
+}
+
+async function generateImage(body) {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "GEMINI_API_KEY is missing. Add it in Render Environment Variables."
+    );
+  }
+
+  const prompt = String(body.prompt || "").trim();
+
+  if (!prompt) {
+    throw new Error("Please enter a prompt.");
+  }
+
+  const aspectRatio = getAspectRatio(body.aspectRatio);
+
+  const parts = [];
+
+  // Main prompt
+  parts.push({
+    text: prompt
   });
 
-  const text = await response.text();
+  // Reference image support
+  if (body.referenceImage) {
+    const base64 = cleanBase64(body.referenceImage);
 
-  let data;
+    if (base64) {
+      let mimeType = "image/jpeg";
 
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      "Image API returned an invalid response."
-    );
+      if (String(body.referenceImage).startsWith("data:image/png")) {
+        mimeType = "image/png";
+      } else if (
+        String(body.referenceImage).startsWith("data:image/webp")
+      ) {
+        mimeType = "image/webp";
+      } else if (
+        String(body.referenceImage).startsWith("data:image/jpeg")
+      ) {
+        mimeType = "image/jpeg";
+      }
+
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64
+        }
+      });
+    }
   }
+
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
+  const requestBody = {
+    contents: [
+      {
+        role: "user",
+        parts: parts
+      }
+    ],
+
+    generationConfig: {
+      responseModalities: ["IMAGE"],
+      imageConfig: {
+        aspectRatio: aspectRatio,
+        imageSize: "1K"
+      }
+    }
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
+
+    body: JSON.stringify(requestBody)
+  });
+
+  const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.error ||
-      data.message ||
-      `Image API error: ${response.status}`
-    );
+    console.error("Gemini API Error:", data);
+
+    const message =
+      data?.error?.message ||
+      data?.error?.status ||
+      "Gemini API request failed.";
+
+    throw new Error(message);
   }
 
-  return data;
-}
+  const candidates = data?.candidates || [];
 
-async function generate(prompt, aspectRatio) {
-  return await apiRequest(
-    `${API_BASE}/api/generate?format=json`,
-    {
-      method: "POST",
+  for (const candidate of candidates) {
+    const responseParts = candidate?.content?.parts || [];
 
-      body: JSON.stringify({
-        prompt: prompt,
-        ratio_id: ratio(aspectRatio)
-      })
-    }
-  );
-}
+    for (const part of responseParts) {
+      if (part.inlineData?.data) {
+        const mimeType =
+          part.inlineData.mimeType || "image/png";
 
-async function pollGeneration(generationId) {
-
-  for (let attempt = 0; attempt < 12; attempt++) {
-
-    await new Promise(resolve =>
-      setTimeout(resolve, 7000)
-    );
-
-    const data = await apiRequest(
-      `${API_BASE}/api/generate/status/${generationId}`,
-      {
-        method: "GET"
+        return {
+          image:
+            `data:${mimeType};base64,${part.inlineData.data}`
+        };
       }
-    );
-
-    if (
-      data.status === "completed" ||
-      data.status === "complete" ||
-      data.status === "success"
-    ) {
-      return data;
-    }
-
-    if (
-      data.status === "failed" ||
-      data.status === "error"
-    ) {
-      throw new Error(
-        data.error ||
-        data.message ||
-        "Image generation failed."
-      );
     }
   }
 
   throw new Error(
-    "Image generation timed out. Please try again."
+    "Gemini returned no image. Try a different prompt."
   );
 }
 
-function findImage(data) {
-
-  return (
-    data.previewUrl ||
-    data.downloadUrl ||
-    data.imageUrl ||
-    data.image ||
-    data.output ||
-    data.url ||
-    null
-  );
-}
-
-const server = http.createServer((req, res) => {
-
-  // CORS
+const server = http.createServer(async (req, res) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
-    return send(res, 204, "");
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
+    });
+
+    res.end();
+    return;
   }
 
-  // Website
-  if (
-    req.method === "GET" &&
-    (req.url === "/" || req.url === "/index.html")
-  ) {
+  // Health check
+  if (req.method === "GET" && req.url === "/") {
+    const indexPath = path.join(__dirname, "index.html");
 
-    try {
+    if (!fs.existsSync(indexPath)) {
+      sendJSON(res, 500, {
+        error: "index.html not found."
+      });
 
-      const file = fs.readFileSync(
-        path.join(__dirname, "index.html")
-      );
-
-      return send(
-        res,
-        200,
-        file,
-        "text/html; charset=utf-8"
-      );
-
-    } catch (error) {
-
-      return send(
-        res,
-        500,
-        JSON.stringify({
-          error: "index.html not found."
-        })
-      );
+      return;
     }
+
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8"
+    });
+
+    fs.createReadStream(indexPath).pipe(res);
+
+    return;
   }
 
   // Generate image
   if (
     req.method === "POST" &&
     (
-      req.url === "/.netlify/functions/generate-image" ||
-      req.url === "/api/generate-image"
+      req.url === "/api/generate-image" ||
+      req.url === "/.netlify/functions/generate-image"
     )
   ) {
-
-    let body = "";
+    let rawBody = "";
 
     req.on("data", chunk => {
-
-      body += chunk;
-
-      if (body.length > 35 * 1024 * 1024) {
-        req.destroy();
-      }
+      rawBody += chunk;
     });
 
     req.on("end", async () => {
-
       try {
+        const body = JSON.parse(rawBody || "{}");
 
-        if (!API_KEY) {
+        const result = await generateImage(body);
 
-          return send(
-            res,
-            500,
-            JSON.stringify({
-              error:
-                "IMAGE_API_KEY is missing in Render Environment."
-            })
-          );
-        }
-
-        let data;
-
-        try {
-          data = JSON.parse(body || "{}");
-        } catch {
-          return send(
-            res,
-            400,
-            JSON.stringify({
-              error: "Invalid JSON request."
-            })
-          );
-        }
-
-        const prompt =
-          String(data.prompt || "").trim();
-
-        const aspectRatio =
-          data.aspectRatio || "1:1";
-
-        if (!prompt) {
-
-          return send(
-            res,
-            400,
-            JSON.stringify({
-              error: "Prompt is required."
-            })
-          );
-        }
-
-        // Start generation
-        let result = await generate(
-          prompt,
-          aspectRatio
-        );
-
-        // Image immediately available
-        let image = findImage(result);
-
-        if (image) {
-
-          return send(
-            res,
-            200,
-            JSON.stringify({
-              image: image,
-              download:
-                result.downloadUrl || image,
-              usage:
-                result.usage || null
-            })
-          );
-        }
-
-        // Async generation
-        const generationId =
-          result.generationId ||
-          result.id;
-
-        if (
-          result.status === "processing" ||
-          result.status === "pending" ||
-          result.status === "queued" ||
-          generationId
-        ) {
-
-          if (!generationId) {
-            throw new Error(
-              "Generation started but no generation ID was returned."
-            );
-          }
-
-          result =
-            await pollGeneration(
-              generationId
-            );
-
-          image = findImage(result);
-
-          if (!image) {
-            throw new Error(
-              "Image URL was not returned."
-            );
-          }
-
-          return send(
-            res,
-            200,
-            JSON.stringify({
-              image: image,
-              download:
-                result.downloadUrl || image,
-              usage:
-                result.usage || null
-            })
-          );
-        }
-
-        throw new Error(
-          "Image URL was not returned by the API."
-        );
+        sendJSON(res, 200, result);
 
       } catch (error) {
+        console.error("Generation Error:", error);
 
-        console.error(
-          "IMAGE GENERATION ERROR:",
-          error
-        );
-
-        return send(
-          res,
-          500,
-          JSON.stringify({
-            error:
-              error.message ||
-              "Image generation failed."
-          })
-        );
+        sendJSON(res, 500, {
+          error: error.message || "Image generation failed."
+        });
       }
     });
 
     return;
   }
 
-  // 404
-  return send(
-    res,
-    404,
-    JSON.stringify({
-      error: "Not found"
-    })
-  );
+  // Serve static files
+  if (req.method === "GET") {
+    let requestedPath = req.url.split("?")[0];
+
+    if (requestedPath === "/") {
+      requestedPath = "/index.html";
+    }
+
+    const filePath = path.join(
+      __dirname,
+      requestedPath
+    );
+
+    if (
+      !filePath.startsWith(__dirname) ||
+      !fs.existsSync(filePath)
+    ) {
+      sendJSON(res, 404, {
+        error: "File not found."
+      });
+
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+
+    const contentTypes = {
+      ".html": "text/html; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".webp": "image/webp",
+      ".svg": "image/svg+xml"
+    };
+
+    res.writeHead(200, {
+      "Content-Type":
+        contentTypes[ext] || "application/octet-stream"
+    });
+
+    fs.createReadStream(filePath).pipe(res);
+
+    return;
+  }
+
+  sendJSON(res, 404, {
+    error: "Not found."
+  });
 });
 
 server.listen(PORT, () => {
-  console.log(
-    `AI-TC running on port ${PORT}`
-  );
+  console.log(`AI TC server running on port ${PORT}`);
+  console.log(`Image model: ${MODEL}`);
 });
