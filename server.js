@@ -1,288 +1,475 @@
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 
-const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-// Gemini image generation model
-const MODEL = "gemini-3.1-flash-image";
+public class Demo {
 
-function sendJSON(res, status, data) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-  });
+    private static final int PORT = 8080;
 
-  res.end(JSON.stringify(data));
-}
+    private static final String API_KEY =
+            System.getenv("GEMINI_API_KEY");
 
-function getAspectRatio(ratio) {
-  const allowed = [
-    "1:1",
-    "16:9",
-    "9:16",
-    "4:5",
-    "3:2",
-    "2:3",
-    "4:3",
-    "21:9"
-  ];
+    private static final String MODEL =
+            "gemini-3.1-flash-image";
 
-  return allowed.includes(ratio) ? ratio : "1:1";
-}
+    private static final HttpClient CLIENT =
+            HttpClient.newHttpClient();
 
-function cleanBase64(value) {
-  if (!value) return null;
+    public static void main(String[] args) throws Exception {
 
-  if (value.includes(",")) {
-    return value.split(",")[1];
-  }
-
-  return value;
-}
-
-async function generateImage(body) {
-  if (!GEMINI_API_KEY) {
-    throw new Error(
-      "GEMINI_API_KEY is missing. Add it in Render Environment Variables."
-    );
-  }
-
-  const prompt = String(body.prompt || "").trim();
-
-  if (!prompt) {
-    throw new Error("Please enter a prompt.");
-  }
-
-  const aspectRatio = getAspectRatio(body.aspectRatio);
-
-  const parts = [];
-
-  // Main prompt
-  parts.push({
-    text: prompt
-  });
-
-  // Reference image support
-  if (body.referenceImage) {
-    const base64 = cleanBase64(body.referenceImage);
-
-    if (base64) {
-      let mimeType = "image/jpeg";
-
-      if (String(body.referenceImage).startsWith("data:image/png")) {
-        mimeType = "image/png";
-      } else if (
-        String(body.referenceImage).startsWith("data:image/webp")
-      ) {
-        mimeType = "image/webp";
-      } else if (
-        String(body.referenceImage).startsWith("data:image/jpeg")
-      ) {
-        mimeType = "image/jpeg";
-      }
-
-      parts.push({
-        inlineData: {
-          mimeType: mimeType,
-          data: base64
+        if (API_KEY == null || API_KEY.isBlank()) {
+            System.out.println(
+                    "ERROR: GEMINI_API_KEY is not set."
+            );
+            System.out.println(
+                    "Set your Google AI Studio API key as the GEMINI_API_KEY environment variable."
+            );
+            return;
         }
-      });
-    }
-  }
 
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+        HttpServer server = HttpServer.create(
+                new InetSocketAddress(PORT), 0
+        );
 
-  const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: parts
-      }
-    ],
+        server.createContext(
+                "/api/generate-image",
+                Demo::generateImage
+        );
 
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-      imageConfig: {
-        aspectRatio: aspectRatio,
-        imageSize: "1K"
-      }
-    }
-  };
+        server.createContext(
+                "/",
+                Demo::serveWebsite
+        );
 
-  const response = await fetch(url, {
-    method: "POST",
+        server.setExecutor(null);
+        server.start();
 
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
-    },
-
-    body: JSON.stringify(requestBody)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("Gemini API Error:", data);
-
-    const message =
-      data?.error?.message ||
-      data?.error?.status ||
-      "Gemini API request failed.";
-
-    throw new Error(message);
-  }
-
-  const candidates = data?.candidates || [];
-
-  for (const candidate of candidates) {
-    const responseParts = candidate?.content?.parts || [];
-
-    for (const part of responseParts) {
-      if (part.inlineData?.data) {
-        const mimeType =
-          part.inlineData.mimeType || "image/png";
-
-        return {
-          image:
-            `data:${mimeType};base64,${part.inlineData.data}`
-        };
-      }
-    }
-  }
-
-  throw new Error(
-    "Gemini returned no image. Try a different prompt."
-  );
-}
-
-const server = http.createServer(async (req, res) => {
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-    });
-
-    res.end();
-    return;
-  }
-
-  // Health check
-  if (req.method === "GET" && req.url === "/") {
-    const indexPath = path.join(__dirname, "index.html");
-
-    if (!fs.existsSync(indexPath)) {
-      sendJSON(res, 500, {
-        error: "index.html not found."
-      });
-
-      return;
+        System.out.println(
+                "AI TC is running at http://localhost:" + PORT
+        );
     }
 
-    res.writeHead(200, {
-      "Content-Type": "text/html; charset=utf-8"
-    });
+    private static void generateImage(
+            HttpExchange exchange
+    ) throws IOException {
 
-    fs.createReadStream(indexPath).pipe(res);
+        addCors(exchange);
 
-    return;
-  }
+        if ("OPTIONS".equalsIgnoreCase(
+                exchange.getRequestMethod()
+        )) {
+            send(exchange, 204, "");
+            return;
+        }
 
-  // Generate image
-  if (
-    req.method === "POST" &&
-    (
-      req.url === "/api/generate-image" ||
-      req.url === "/.netlify/functions/generate-image"
-    )
-  ) {
-    let rawBody = "";
+        if (!"POST".equalsIgnoreCase(
+                exchange.getRequestMethod()
+        )) {
+            sendJson(
+                    exchange,
+                    405,
+                    "{\"error\":\"POST method required\"}"
+            );
+            return;
+        }
 
-    req.on("data", chunk => {
-      rawBody += chunk;
-    });
+        try {
 
-    req.on("end", async () => {
-      try {
-        const body = JSON.parse(rawBody || "{}");
+            String body = readBody(exchange);
 
-        const result = await generateImage(body);
+            String prompt =
+                    extractJsonString(body, "prompt");
 
-        sendJSON(res, 200, result);
+            String aspectRatio =
+                    extractJsonString(body, "aspectRatio");
 
-      } catch (error) {
-        console.error("Generation Error:", error);
+            if (prompt == null || prompt.isBlank()) {
+                sendJson(
+                        exchange,
+                        400,
+                        "{\"error\":\"Prompt is required\"}"
+                );
+                return;
+            }
 
-        sendJSON(res, 500, {
-          error: error.message || "Image generation failed."
-        });
-      }
-    });
+            if (aspectRatio == null ||
+                    aspectRatio.isBlank()) {
+                aspectRatio = "1:1";
+            }
 
-    return;
-  }
+            aspectRatio =
+                    cleanAspectRatio(aspectRatio);
 
-  // Serve static files
-  if (req.method === "GET") {
-    let requestedPath = req.url.split("?")[0];
+            String geminiResponse =
+                    callGemini(prompt, aspectRatio);
 
-    if (requestedPath === "/") {
-      requestedPath = "/index.html";
+            String image =
+                    extractImageBase64(geminiResponse);
+
+            if (image == null) {
+                sendJson(
+                        exchange,
+                        500,
+                        "{\"error\":\"No image was returned by Gemini.\"}"
+                );
+                return;
+            }
+
+            String result =
+                    "{"
+                    + "\"success\":true,"
+                    + "\"image\":\""
+                    + escapeJson(image)
+                    + "\""
+                    + "}";
+
+            sendJson(
+                    exchange,
+                    200,
+                    result
+            );
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            String message =
+                    e.getMessage() == null
+                            ? "Image generation failed."
+                            : e.getMessage();
+
+            sendJson(
+                    exchange,
+                    500,
+                    "{"
+                    + "\"success\":false,"
+                    + "\"error\":\""
+                    + escapeJson(message)
+                    + "\""
+                    + "}"
+            );
+        }
     }
 
-    const filePath = path.join(
-      __dirname,
-      requestedPath
-    );
+    private static String callGemini(
+            String prompt,
+            String aspectRatio
+    ) throws Exception {
 
-    if (
-      !filePath.startsWith(__dirname) ||
-      !fs.existsSync(filePath)
+        String url =
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                + MODEL
+                + ":generateContent";
+
+        String requestBody =
+                "{"
+                + "\"contents\":["
+                + "{"
+                + "\"parts\":["
+                + "{"
+                + "\"text\":\""
+                + escapeJson(prompt)
+                + "\""
+                + "}"
+                + "]"
+                + "}"
+                + "],"
+                + "\"generationConfig\":{"
+                + "\"responseModalities\":[\"IMAGE\"],"
+                + "\"imageConfig\":{"
+                + "\"aspectRatio\":\""
+                + aspectRatio
+                + "\","
+                + "\"imageSize\":\"1K\""
+                + "}"
+                + "}"
+                + "}";
+
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .header(
+                                "Content-Type",
+                                "application/json"
+                        )
+                        .header(
+                                "x-goog-api-key",
+                                API_KEY
+                        )
+                        .POST(
+                                HttpRequest.BodyPublishers
+                                        .ofString(requestBody)
+                        )
+                        .build();
+
+        HttpResponse<String> response =
+                CLIENT.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString()
+                );
+
+        if (response.statusCode() < 200 ||
+                response.statusCode() >= 300) {
+
+            throw new Exception(
+                    "Gemini API Error "
+                    + response.statusCode()
+                    + ": "
+                    + response.body()
+            );
+        }
+
+        return response.body();
+    }
+
+    private static String extractImageBase64(
+            String json
     ) {
-      sendJSON(res, 404, {
-        error: "File not found."
-      });
 
-      return;
+        Pattern pattern =
+                Pattern.compile(
+                        "\"data\"\\s*:\\s*\"([^\"]+)\""
+                );
+
+        Matcher matcher =
+                pattern.matcher(json);
+
+        if (matcher.find()) {
+            return "data:image/png;base64,"
+                    + matcher.group(1);
+        }
+
+        return null;
     }
 
-    const ext = path.extname(filePath).toLowerCase();
+    private static void serveWebsite(
+            HttpExchange exchange
+    ) throws IOException {
 
-    const contentTypes = {
-      ".html": "text/html; charset=utf-8",
-      ".css": "text/css; charset=utf-8",
-      ".js": "application/javascript; charset=utf-8",
-      ".json": "application/json; charset=utf-8",
-      ".png": "image/png",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".webp": "image/webp",
-      ".svg": "image/svg+xml"
-    };
+        addCors(exchange);
 
-    res.writeHead(200, {
-      "Content-Type":
-        contentTypes[ext] || "application/octet-stream"
-    });
+        String requestPath =
+                exchange.getRequestURI()
+                        .getPath();
 
-    fs.createReadStream(filePath).pipe(res);
+        if (!requestPath.equals("/") &&
+                !requestPath.equals("/index.html")) {
 
-    return;
-  }
+            send(
+                    exchange,
+                    404,
+                    "Not Found"
+            );
+            return;
+        }
 
-  sendJSON(res, 404, {
-    error: "Not found."
-  });
-});
+        Path file =
+                Paths.get("index.html");
 
-server.listen(PORT, () => {
-  console.log(`AI TC server running on port ${PORT}`);
-  console.log(`Image model: ${MODEL}`);
-});
+        if (!Files.exists(file)) {
+
+            send(
+                    exchange,
+                    404,
+                    "index.html not found"
+            );
+            return;
+        }
+
+        byte[] data =
+                Files.readAllBytes(file);
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Content-Type",
+                        "text/html; charset=UTF-8"
+                );
+
+        exchange.sendResponseHeaders(
+                200,
+                data.length
+        );
+
+        try (OutputStream output =
+                     exchange.getResponseBody()) {
+
+            output.write(data);
+        }
+    }
+
+    private static String readBody(
+            HttpExchange exchange
+    ) throws IOException {
+
+        try (InputStream input =
+                     exchange.getRequestBody()) {
+
+            return new String(
+                    input.readAllBytes(),
+                    StandardCharsets.UTF_8
+            );
+        }
+    }
+
+    private static String extractJsonString(
+            String json,
+            String key
+    ) {
+
+        String regex =
+                "\"" + Pattern.quote(key)
+                + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"";
+
+        Matcher matcher =
+                Pattern.compile(regex)
+                        .matcher(json);
+
+        if (!matcher.find()) {
+            return null;
+        }
+
+        return matcher.group(1)
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t");
+    }
+
+    private static String cleanAspectRatio(
+            String ratio
+    ) {
+
+        String[] allowed = {
+                "1:1",
+                "16:9",
+                "9:16",
+                "4:3",
+                "3:4",
+                "4:5",
+                "5:4",
+                "3:2",
+                "2:3",
+                "21:9"
+        };
+
+        for (String value : allowed) {
+            if (value.equals(ratio)) {
+                return value;
+            }
+        }
+
+        return "1:1";
+    }
+
+    private static String escapeJson(
+            String value
+    ) {
+
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private static void addCors(
+            HttpExchange exchange
+    ) {
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Access-Control-Allow-Origin",
+                        "*"
+                );
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Access-Control-Allow-Headers",
+                        "Content-Type"
+                );
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Access-Control-Allow-Methods",
+                        "GET,POST,OPTIONS"
+                );
+    }
+
+    private static void send(
+            HttpExchange exchange,
+            int status,
+            String text
+    ) throws IOException {
+
+        byte[] data =
+                text.getBytes(
+                        StandardCharsets.UTF_8
+                );
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Content-Type",
+                        "text/plain; charset=UTF-8"
+                );
+
+        exchange.sendResponseHeaders(
+                status,
+                data.length
+        );
+
+        try (OutputStream output =
+                     exchange.getResponseBody()) {
+
+            output.write(data);
+        }
+    }
+
+    private static void sendJson(
+            HttpExchange exchange,
+            int status,
+            String json
+    ) throws IOException {
+
+        byte[] data =
+                json.getBytes(
+                        StandardCharsets.UTF_8
+                );
+
+        exchange.getResponseHeaders()
+                .set(
+                        "Content-Type",
+                        "application/json; charset=UTF-8"
+                );
+
+        exchange.sendResponseHeaders(
+                status,
+                data.length
+        );
+
+        try (OutputStream output =
+                     exchange.getResponseBody()) {
+
+            output.write(data);
+        }
+    }
+  }.,
